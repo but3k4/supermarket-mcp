@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy supermarket_mcp
+
+      - name: Bandit
+        run: uv run bandit -r supermarket_mcp
+
+      - name: Pytest
+        run: uv run pytest
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: supermarket-mcp-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name supermarket-mcp-smoke -p 8765:8765 supermarket-mcp-server:ci
+          trap 'docker logs supermarket-mcp-smoke; docker rm -f supermarket-mcp-smoke' EXIT
+          # FastMCP serves the protocol at /mcp (there is no /healthz). A plain
+          # GET won't return 2xx, so we only assert the server is accepting HTTP.
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8765/mcp || echo 000)
+            if [ "$code" != "000" ]; then
+              echo "Server responding (HTTP $code) after $((i * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for the server to accept connections" >&2
+          exit 1

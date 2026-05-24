@@ -1,0 +1,39 @@
+[project]
+name = "supermarket-mcp"
+version = "0.1.0"
+description = "MCP server for Irish supermarket product search"
+readme = "README.md"
+requires-python = ">=3.14"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Claudio Borges", email = "but3k4@gmail.com" },
+]
+dependencies = [
+    "bs4>=0.0.2",
+    "mcp[cli]>=1.2.0",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+supermarket-mcp = "supermarket_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "mypy>=2.1.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["supermarket_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]

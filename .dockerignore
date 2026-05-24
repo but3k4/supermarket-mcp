@@ -1,0 +1,17 @@
+__pycache__/
+.coverage
+.DS_Store
+.env
+.git/
+.gitignore
+.mypy_cache/
+.pytest_cache/
+.python-version
+.ruff_cache/
+.venv/
+*.pyc
+**/__pycache__/
+htmlcov/
+ruff.toml
+scripts/
+tests/
