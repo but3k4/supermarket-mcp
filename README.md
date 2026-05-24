@@ -1,6 +1,6 @@
 # supermarket
 
-MCP server for Irish supermarket product search. An LLM client can search products and assemble a shopping list across stores, with each store reached through [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) to clear its bot protection.
+MCP server for Irish supermarket product search. An LLM client can search products and assemble a shopping list across stores. Most stores are reached through [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) to clear their bot protection. Mr Price is a plain Shopify storefront and needs no FlareSolverr.
 
 ## Stores
 
@@ -13,10 +13,11 @@ Pick a store with the `store` argument on each tool.
 | `aldi` | aldi.ie | Bot block | Same cookie-reuse model as Dunnes, but its own URL scheme and `product-tile` DOM. |
 | `tesco` | tesco.ie | Akamai | Every search fetched through FlareSolverr (Akamai validates per request). |
 | `lidl` | lidl.ie | JS-rendered | Every search fetched through FlareSolverr (the product grid is rendered client-side). |
+| `mrprice` | mrprice.online | None (Shopify) | Stateless. Search results page parsed over plain `requests`, no FlareSolverr. |
 
 ## How it works
 
-Each store owns its own session. **Dunnes**, **SuperValu**, and **Aldi** share one cookie-reuse model: each bootstraps a FlareSolverr browser session, harvests the cookies + user-agent, and reuses them with plain `requests`. FlareSolverr is only re-invoked on a challenge (expired cookie) or when the session ages past `MCP_SESSION_TTL`. Dunnes and SuperValu run the same storefront platform (only host + retailer id differ). Aldi reuses the same session lifecycle but has its own URL scheme and `product-tile` DOM. **Tesco** and **Lidl** can't reuse cookies. Tesco's Akamai validates per request, and Lidl renders its grid client-side. So they fetch every results page through FlareSolverr. Either way, cookies/sessions are bound to the FlareSolverr host's IP, so the server must share that outbound IP.
+Each store owns its own session. **Dunnes**, **SuperValu**, and **Aldi** share one cookie-reuse model: each bootstraps a FlareSolverr browser session, harvests the cookies + user-agent, and reuses them with plain `requests`. FlareSolverr is only re-invoked on a challenge (expired cookie) or when the session ages past `MCP_SESSION_TTL`. Dunnes and SuperValu run the same storefront platform (only host + retailer id differ). Aldi reuses the same session lifecycle but has its own URL scheme and `product-tile` DOM. **Tesco** and **Lidl** can't reuse cookies. Tesco's Akamai validates per request, and Lidl renders its grid client-side. So they fetch every results page through FlareSolverr. Either way, cookies/sessions are bound to the FlareSolverr host's IP, so the server must share that outbound IP. **Mr Price** is the exception: it runs on Shopify with no bot protection, so it skips FlareSolverr entirely and parses the search results page directly with plain `requests`.
 
 SuperValu's search is stricter than the others: a long query with pack-size tokens (`Volvic Natural Mineral Water 6 x 1.5l`) often matches nothing, while the trimmed query (`Volvic`) returns the full grid. To cope, the cookie-reuse stores retry once on an empty result with the size tokens stripped (`12 x 330ml`, `2L`, `1000g`, `48 washes`, ...), then let the caller pick the right pack from the broadened candidates. The retry only fires when the literal query returned nothing, so it never narrows a query that already worked. It can't rescue every case (a non-size word like "Jar" can still throw the search off), so refine the query if a known product comes back empty.
 
@@ -181,7 +182,7 @@ uv run pytest -v tests/ --cov
 FLARESOLVERR_URL=http://127.0.0.1:8191/v1 uv run python scripts/smoke.py "milk" --store tesco --limit 3
 ```
 
-Layout: `supermarket_mcp/server.py` (FastMCP app + tools), `flaresolverr.py` and `helpers.py` (shared), and one module per store under `supermarket_mcp/stores/`. Stores share one of two session bases: cookie-reuse stores (Dunnes, SuperValu, Aldi) extend `CookieReuseStore` in `stores/_cookie_reuse.py`. Per-request FlareSolverr stores (Tesco, Lidl) extend `FlareSolverrStore` in `stores/_flaresolverr_store.py`. To add a store, implement the `Store` protocol from `stores/base.py`. Usually by extending the base that matches its protection (supply the home/search URL and parser). And register it in `server.STORES`.
+Layout: `supermarket_mcp/server.py` (FastMCP app + tools), `flaresolverr.py` and `helpers.py` (shared), and one module per store under `supermarket_mcp/stores/`. Stores share one of two session bases: cookie-reuse stores (Dunnes, SuperValu, Aldi) extend `CookieReuseStore` in `stores/_cookie_reuse.py`. Per-request FlareSolverr stores (Tesco, Lidl) extend `FlareSolverrStore` in `stores/_flaresolverr_store.py`. Mr Price needs no bot bypass, so it implements the `Store` protocol directly with no base. To add a store, implement the `Store` protocol from `stores/base.py`. Usually by extending the base that matches its protection (supply the home/search URL and parser). And register it in `server.STORES`.
 
 ## License
 

@@ -2,8 +2,9 @@
 Supermarket MCP server.
 
 Exposes grocery search across multiple Irish supermarkets (Dunnes, SuperValu,
-Aldi, Tesco, Lidl) as MCP tools. Each store owns its own FlareSolverr-backed
-session lifecycle. The tools dispatch on a store argument.
+Aldi, Tesco, Lidl, Mr Price) as MCP tools. Each store owns its own session
+lifecycle (FlareSolverr-backed, except Mr Price, a plain Shopify storefront
+scraped over HTTP). The tools dispatch on a store argument.
 
 Usage:
     uv run supermarket-mcp                                  # stdio (default)
@@ -29,6 +30,7 @@ from mcp.server.fastmcp import FastMCP
 from supermarket_mcp.stores.aldi import AldiStore
 from supermarket_mcp.stores.dunnes import DunnesStore
 from supermarket_mcp.stores.lidl import LidlStore
+from supermarket_mcp.stores.mrprice import MrPriceStore
 from supermarket_mcp.stores.supervalu import SuperValuStore
 from supermarket_mcp.stores.tesco import TescoStore
 
@@ -48,6 +50,7 @@ STORES: dict[str, Store] = {
     "aldi": AldiStore(ttl_seconds=SESSION_TTL_SECONDS),
     "tesco": TescoStore(),
     "lidl": LidlStore(),
+    "mrprice": MrPriceStore(),
 }
 
 
@@ -96,7 +99,8 @@ async def search_product(query: str, store: str = "dunnes", limit: int = 10) -> 
 
     Args:
         query: Free-text product search, e.g. "Avonmore Fresh Milk 2L".
-        store: Which store: "dunnes", "supervalu", "aldi", "tesco", or "lidl".
+        store: Which store: "dunnes", "supervalu", "aldi", "tesco", "lidl", or
+            "mrprice".
         limit: Maximum number of candidates to return.
 
     Returns:
@@ -126,7 +130,8 @@ async def build_shopping_list(
 
     Args:
         queries: Product search strings, one per shopping-list item.
-        store: Which store: "dunnes", "supervalu", "aldi", "tesco", or "lidl".
+        store: Which store: "dunnes", "supervalu", "aldi", "tesco", "lidl", or
+            "mrprice".
         limit: Maximum number of candidates to return per query.
 
     Returns:

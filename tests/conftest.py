@@ -118,6 +118,38 @@ def lidl_page(*products):
     return f"<html><body>{body}</body></html>"
 
 
+def mrprice_page(*products):
+    """
+    Mirrors a Mr Price (Shopify) search results grid: a #js-product-ajax
+    container of .product-card tiles. Each product is a dict: {title, price
+    (integer cents), was?, sold?}. MrPriceStore._extract reads this grid.
+    """
+
+    cards = []
+    for p in products:
+        was = (
+            f'<s class="product-card__regular-price">{p["was"]}</s>'
+            if p.get("was")
+            else ""
+        )
+        cart = "Sold Out" if p.get("sold") else "Add to Basket"
+        slug = p["title"].lower().replace(" ", "-")
+        cards.append(
+            f"""
+        <div class="product-card js-product-card" data-price="{p["price"]}">
+          <div class="product-card__info">
+            <a href="/products/{slug}?_pos=1&_ss=r" title="{p["title"]}">{p["title"]}</a>
+            <div class="product-card__price">€{int(p["price"]) / 100:.2f} {was}</div>
+            <span>{cart}</span>
+          </div>
+        </div>"""
+        )
+
+    body = "".join(cards)
+
+    return f'<html><body><div id="js-product-ajax"><div class="row">{body}</div></div></body></html>'
+
+
 class FakeStore:
     def __init__(self, results=None):
         self.name = "fake"
